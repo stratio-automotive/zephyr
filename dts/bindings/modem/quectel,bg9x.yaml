@@ -1,7 +1,7 @@
-# Copyright (c) 2020 Analog Life LLC
+# Copyright (c) 2023 Bjarki Arge Andreasen
 # SPDX-License-Identifier: Apache-2.0
 
-description: quectel BG9x modem
+description: Quectel BG9X modems
 
 compatible: "quectel,bg9x"
 
@@ -14,9 +14,4 @@ properties:
 
   mdm-reset-gpios:
     type: phandle-array
-
-  mdm-dtr-gpios:
-    type: phandle-array
-
-  mdm-wdisable-gpios:
-    type: phandle-array
+    required: true
