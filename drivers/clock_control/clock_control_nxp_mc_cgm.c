@@ -40,6 +40,160 @@ const clock_pcfs_config_t pcfs_config = {.maxAllowableIDDchange = NXP_PLL_MAXIDO
 					 .clkSrcFreq = NXP_PLL_CLKSRCFREQ};
 #endif
 
+/*
+ * SDK defines FSL_FEATURE_SOC_<IP>_COUNT as `(N)` with parentheses, which
+ * breaks Zephyr's LISTIFY (it token-pastes LEN into a macro name and needs
+ * a bare integer). Strip the parens before passing to LISTIFY.
+ */
+#define MC_CGM_UNWRAP(...) __VA_ARGS__
+#define MC_CGM_COUNT(n)   MC_CGM_UNWRAP n
+
+/*
+ * The SDK exposes peripheral clocks via two distinct enum namespaces:
+ *   - clock_ip_name_t (kCLOCK_Lpuart0)    feeds CLOCK_EnableClock() /
+ *                                         CLOCK_DisableClock() — the gate
+ *                                         path used by _on()/_off().
+ *   - clock_name_t   (kCLOCK_Lpuart0Clk)  feeds CLOCK_GetFreq() — the
+ *                                         clock-tree query used by
+ *                                         _get_rate().
+ * Keep two parallel tables so each entry carries the right typed enum,
+ * and let _on()/_off() share the gate table.
+ *
+ * `dt` is the DT-binding prefix (uppercase, e.g. LPUART -> MCUX_LPUART0_CLK);
+ * `sdk` is the SDK enum prefix (CamelCase, e.g. Lpuart -> kCLOCK_Lpuart0).
+ * LISTIFY iterates 0..(N-1) where N is FSL_FEATURE_SOC_<IP>_COUNT, so
+ * undefined SDK identifiers on derivative SoCs are never referenced.
+ */
+struct mc_cgm_gate_entry {
+	uint32_t subsys;
+	clock_ip_name_t sdk_enum;
+};
+
+struct mc_cgm_rate_entry {
+	uint32_t subsys;
+	clock_name_t sdk_enum;
+};
+
+#define MC_CGM_GATE_ENTRY(i, dt, sdk) \
+	{ MCUX_##dt##i##_CLK, kCLOCK_##sdk##i }
+
+#define MC_CGM_RATE_ENTRY(i, dt, sdk) \
+	{ MCUX_##dt##i##_CLK, kCLOCK_##sdk##i##Clk }
+
+static const struct mc_cgm_gate_entry mc_cgm_gate_map[] = {
+#if defined(CONFIG_CAN_MCUX_FLEXCAN) && defined(FSL_FEATURE_SOC_FLEXCAN_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_FLEXCAN_COUNT),
+		MC_CGM_GATE_ENTRY, (,), FLEXCAN, Flexcan),
+#endif
+#if defined(CONFIG_UART_MCUX_LPUART) && defined(FSL_FEATURE_SOC_LPUART_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPUART_COUNT),
+		MC_CGM_GATE_ENTRY, (,), LPUART, Lpuart),
+#endif
+#if defined(CONFIG_SPI_NXP_LPSPI) && defined(FSL_FEATURE_SOC_LPSPI_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPSPI_COUNT),
+		MC_CGM_GATE_ENTRY, (,), LPSPI, Lpspi),
+#endif
+#if defined(CONFIG_I2C_MCUX_LPI2C) && defined(FSL_FEATURE_SOC_LPI2C_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPI2C_COUNT),
+		MC_CGM_GATE_ENTRY, (,), LPI2C, Lpi2c),
+#endif
+#if (defined(CONFIG_COUNTER_MCUX_STM) || defined(CONFIG_MCUX_STM_TIMER)) && \
+	defined(FSL_FEATURE_SOC_STM_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_STM_COUNT),
+		MC_CGM_GATE_ENTRY, (,), STM, Stm),
+#endif
+#if defined(CONFIG_COUNTER_NXP_PIT) && defined(FSL_FEATURE_SOC_PIT_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_PIT_COUNT),
+		MC_CGM_GATE_ENTRY, (,), PIT, Pit),
+#endif
+#if defined(CONFIG_COMPARATOR_NXP_LPCMP) && defined(FSL_FEATURE_SOC_LPCMP_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPCMP_COUNT),
+		MC_CGM_GATE_ENTRY, (,), CMP, Lpcmp),
+#endif
+#if defined(CONFIG_ADC_NXP_SAR_ADC) && defined(FSL_FEATURE_SOC_ADC_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_ADC_COUNT),
+		MC_CGM_GATE_ENTRY, (,), ADC, Adc),
+#endif
+#if defined(CONFIG_I2S_MCUX_SAI) && defined(FSL_FEATURE_SOC_I2S_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_I2S_COUNT),
+		MC_CGM_GATE_ENTRY, (,), SAI, Sai),
+#endif
+#if defined(CONFIG_MSPI_NXP_QSPI)
+	{ MCUX_QSPISF_CLK, kCLOCK_Qspi },
+#endif
+};
+
+/*
+ * LPCMP: SDK naming is inconsistent between the two namespaces —
+ * clock_ip_name_t uses "Lpcmp" (kCLOCK_Lpcmp0), but clock_name_t
+ * drops the "Lp" (kCLOCK_Cmp0Clk). Pass "Cmp" as the SDK prefix
+ * here so CLOCK_GetFreq receives the right identifier.
+ */
+static const struct mc_cgm_rate_entry mc_cgm_rate_map[] = {
+#if defined(CONFIG_CAN_MCUX_FLEXCAN) && defined(FSL_FEATURE_SOC_FLEXCAN_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_FLEXCAN_COUNT),
+		MC_CGM_RATE_ENTRY, (,), FLEXCAN, Flexcan),
+#endif
+#if defined(CONFIG_UART_MCUX_LPUART) && defined(FSL_FEATURE_SOC_LPUART_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPUART_COUNT),
+		MC_CGM_RATE_ENTRY, (,), LPUART, Lpuart),
+#endif
+#if defined(CONFIG_SPI_NXP_LPSPI) && defined(FSL_FEATURE_SOC_LPSPI_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPSPI_COUNT),
+		MC_CGM_RATE_ENTRY, (,), LPSPI, Lpspi),
+#endif
+#if defined(CONFIG_I2C_MCUX_LPI2C) && defined(FSL_FEATURE_SOC_LPI2C_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPI2C_COUNT),
+		MC_CGM_RATE_ENTRY, (,), LPI2C, Lpi2c),
+#endif
+#if (defined(CONFIG_COUNTER_MCUX_STM) || defined(CONFIG_MCUX_STM_TIMER)) && \
+	defined(FSL_FEATURE_SOC_STM_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_STM_COUNT),
+		MC_CGM_RATE_ENTRY, (,), STM, Stm),
+#endif
+#if defined(CONFIG_COUNTER_NXP_PIT) && defined(FSL_FEATURE_SOC_PIT_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_PIT_COUNT),
+		MC_CGM_RATE_ENTRY, (,), PIT, Pit),
+#endif
+#if defined(CONFIG_COMPARATOR_NXP_LPCMP) && defined(FSL_FEATURE_SOC_LPCMP_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_LPCMP_COUNT),
+		MC_CGM_RATE_ENTRY, (,), CMP, Cmp),
+#endif
+#if defined(CONFIG_ADC_NXP_SAR_ADC) && defined(FSL_FEATURE_SOC_ADC_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_ADC_COUNT),
+		MC_CGM_RATE_ENTRY, (,), ADC, Adc),
+#endif
+#if defined(CONFIG_I2S_MCUX_SAI) && defined(FSL_FEATURE_SOC_I2S_COUNT)
+	LISTIFY(MC_CGM_COUNT(FSL_FEATURE_SOC_I2S_COUNT),
+		MC_CGM_RATE_ENTRY, (,), SAI, Sai),
+#endif
+#if defined(CONFIG_MSPI_NXP_QSPI)
+	{ MCUX_QSPISF_CLK, kCLOCK_QspiSfClk },
+#endif
+};
+
+static const struct mc_cgm_gate_entry *mc_cgm_lookup_gate(uint32_t subsys)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(mc_cgm_gate_map); i++) {
+		if (mc_cgm_gate_map[i].subsys == subsys) {
+			return &mc_cgm_gate_map[i];
+		}
+	}
+
+	return NULL;
+}
+
+static const struct mc_cgm_rate_entry *mc_cgm_lookup_rate(uint32_t subsys)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(mc_cgm_rate_map); i++) {
+		if (mc_cgm_rate_map[i].subsys == subsys) {
+			return &mc_cgm_rate_map[i];
+		}
+	}
+
+	return NULL;
+}
+
 static int mc_cgm_clock_control_on(const struct device *dev, clock_control_subsys_t sub_system)
 {
 	uint32_t clock_name = (uint32_t)sub_system;
@@ -481,6 +635,11 @@ static int mc_cgm_init(const struct device *dev)
 		CLOCK_SetClkDiv(kCLOCK_DivFlexcan345PeClk, 1U);
 #endif
 #endif /* defined(CONFIG_CAN_MCUX_FLEXCAN) */
+
+#if DT_HAS_COMPAT_STATUS_OKAY(nxp_qspi)
+	CLOCK_SetClkDiv(kCLOCK_DivQspiSfckClk, NXP_PLL_MUX_10_DC_0_DIV);
+	CLOCK_AttachClk(kPLL_PHI1_CLK_to_QSPI_SFCK);
+#endif
 
 	/* Set SystemCoreClock variable. */
 	SystemCoreClockUpdate();
