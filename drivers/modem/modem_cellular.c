@@ -2433,11 +2433,16 @@ MODEM_CHAT_SCRIPT_DEFINE(quectel_bg9x_shutdown_chat_script,
 			 modem_cellular_chat_callback_handler, 1);
 #endif
 
+#define BUS_HAS_FLOW_CONTROL(modem) DT_PROP_OR(DT_BUS(DT_COMPAT_GET_ANY_STATUS_OKAY(modem)), hw_flow_control, 0)
+
 #if DT_HAS_COMPAT_STATUS_OKAY(quectel_eg25_g) || DT_HAS_COMPAT_STATUS_OKAY(quectel_eg21_g)
 MODEM_CHAT_SCRIPT_CMDS_DEFINE(
 	quectel_eg2x_g_init_chat_script_cmds, MODEM_CHAT_SCRIPT_CMD_RESP("ATE0", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CFUN=4", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CMEE=1", ok_match),
+#if BUS_HAS_FLOW_CONTROL(quectel_eg25_g) || BUS_HAS_FLOW_CONTROL(quectel_eg21_g)
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+IFC=2,2", ok_match),
+#endif
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CREG=1", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGREG=1", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEREG=1", ok_match),
