@@ -438,7 +438,7 @@ enum dns_resolve_context_state {
  */
 struct dns_resolve_context {
 	/** List of configured DNS servers */
-	struct dns_server {
+	struct dns_server_info {
 		/** DNS server information */
 		struct net_sockaddr dns_server;
 

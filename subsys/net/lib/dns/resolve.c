@@ -375,7 +375,7 @@ unlock:
 
 static int register_dispatcher(struct dns_resolve_context *ctx,
 			       const struct net_socket_service_desc *svc,
-			       struct dns_server *server,
+			       struct dns_server_info *server,
 			       struct net_sockaddr *local,
 			       const struct net_in6_addr *addr6,
 			       const struct net_in_addr *addr4)
