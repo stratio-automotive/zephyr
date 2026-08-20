@@ -197,6 +197,12 @@ static const struct mc_cgm_rate_entry *mc_cgm_lookup_rate(uint32_t subsys)
 static int mc_cgm_clock_control_on(const struct device *dev, clock_control_subsys_t sub_system)
 {
 	uint32_t clock_name = (uint32_t)sub_system;
+	const struct mc_cgm_gate_entry *entry = mc_cgm_lookup_gate(clock_name);
+
+	if (entry != NULL) {
+		CLOCK_EnableClock(entry->sdk_enum);
+		return 0;
+	}
 
 	switch (clock_name) {
 #if defined(CONFIG_CAN_MCUX_FLEXCAN)
@@ -411,6 +417,12 @@ static int mc_cgm_get_subsys_rate(const struct device *dev, clock_control_subsys
 				  uint32_t *rate)
 {
 	uint32_t clock_name = (uint32_t)sub_system;
+	const struct mc_cgm_rate_entry *entry = mc_cgm_lookup_rate(clock_name);
+
+	if (entry != NULL) {
+		*rate = CLOCK_GetFreq(entry->sdk_enum);
+		return 0;
+	}
 
 	switch (clock_name) {
 	case MCUX_SIRC_CLK:
